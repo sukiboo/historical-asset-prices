@@ -1,20 +1,30 @@
+from __future__ import annotations
+
+import logging
+import os
+from logging.handlers import RotatingFileHandler
+
+import pandas as pd
 from polygon import RESTClient
 from polygon.exceptions import BadResponse
-import pandas as pd
-import os
-import logging
-from logging.handlers import RotatingFileHandler
+from tenacity import (
+    after_log,
+    before_sleep_log,
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 from urllib3.exceptions import MaxRetryError
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, before_sleep_log, after_log
 
 # Configure logging to both console and file
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(),  # Console output
-        RotatingFileHandler('logs.log', maxBytes=10*1024*1024, backupCount=5)  # File output
-    ]
+        RotatingFileHandler("logs.log", maxBytes=10 * 1024 * 1024, backupCount=5),  # File output
+    ],
 )
 logger = logging.getLogger(__name__)
 
@@ -34,6 +44,7 @@ MAX_RETRIES = 10
 
 def with_retry(func):
     """Apply retry decorator to a function. For iterators, converts to list."""
+
     @retry(
         stop=stop_after_attempt(MAX_RETRIES),
         wait=wait_exponential(min=MIN_DELAY, max=MAX_DELAY),
@@ -43,11 +54,11 @@ def with_retry(func):
     )
     def wrapper(*args, **kwargs):
         result = func(*args, **kwargs)
-        if hasattr(result, '__iter__') and not isinstance(result, (str, bytes)):
+        if hasattr(result, "__iter__") and not isinstance(result, (str, bytes)):
             return list(result)
         return result
-    return wrapper
 
+    return wrapper
 
 
 for TICKER in TICKERS:
@@ -81,9 +92,7 @@ for TICKER in TICKERS:
             df = pd.DataFrame([a.__dict__ for a in aggs])
             if "timestamp" in df.columns and pd.api.types.is_numeric_dtype(df["timestamp"]):
                 df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
-            df.to_parquet(
-                f"data/{TICKER}/{current_date.strftime('%Y-%m')}.parquet", index=False
-            )
+            df.to_parquet(f"data/{TICKER}/{current_date.strftime('%Y-%m')}.parquet", index=False)
         else:
             logger.warning(
                 f"{TICKER} prices: no records returned "
