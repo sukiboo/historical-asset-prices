@@ -2,6 +2,20 @@ from __future__ import annotations
 
 import logging
 from logging.handlers import RotatingFileHandler
+from typing import Any, Callable
+
+from polygon.exceptions import BadResponse
+from tenacity import (
+    after_log,
+    before_sleep_log,
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
+from urllib3.exceptions import MaxRetryError
+
+from src.constants import MAX_DELAY, MAX_RETRIES, MIN_DELAY
 
 
 def setup_logging(
@@ -44,3 +58,34 @@ def setup_logging(
 
     # Return the root logger so callers may do `logger = setup_logging()` safely
     return logging.getLogger()
+
+
+def with_retry(
+    func: Callable[..., Any],
+    logger: logging.Logger | None = None,
+    max_retries: int = MAX_RETRIES,
+    min_delay: int = MIN_DELAY,
+    max_delay: int = MAX_DELAY,
+) -> Callable[..., Any]:
+    """Wrap a callable with retry logic and list-materialization for iterables.
+
+    Parameters mirror sensible defaults used in the app. Pass a module logger
+    (e.g., logging.getLogger(__name__)) so tenacity can log retries.
+    """
+
+    effective_logger = logger or logging.getLogger(getattr(func, "__module__", __name__))
+
+    @retry(
+        stop=stop_after_attempt(max_retries),
+        wait=wait_exponential(min=min_delay, max=max_delay),
+        retry=retry_if_exception_type((BadResponse, MaxRetryError)),
+        before_sleep=before_sleep_log(effective_logger, logging.DEBUG),
+        after=after_log(effective_logger, logging.DEBUG),
+    )
+    def wrapper(*args: Any, **kwargs: Any):
+        result = func(*args, **kwargs)
+        if hasattr(result, "__iter__") and not isinstance(result, (str, bytes)):
+            return list(result)
+        return result
+
+    return wrapper
