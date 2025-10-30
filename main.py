@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
-from logging.handlers import RotatingFileHandler
+from typing import cast
 
 import pandas as pd
 from polygon import RESTClient
@@ -17,16 +17,9 @@ from tenacity import (
 )
 from urllib3.exceptions import MaxRetryError
 
-# Configure logging to both console and file
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(),  # Console output
-        RotatingFileHandler("logs.log", maxBytes=10 * 1024 * 1024, backupCount=5),  # File output
-    ],
-)
-logger = logging.getLogger(__name__)
+from src.utils import setup_logging
+
+logger = setup_logging()
 
 
 API_KEY = os.getenv("POLYGON_API_KEY")
@@ -63,11 +56,14 @@ def with_retry(func):
 
 for TICKER in TICKERS:
     os.makedirs(f"data/{TICKER}", exist_ok=True)
-    current_date = pd.Timestamp(DATE_START)
+    current_date: pd.Timestamp = cast(pd.Timestamp, pd.Timestamp(DATE_START))
     fetch_aggs = with_retry(client.list_aggs)
 
     while current_date <= pd.Timestamp(DATE_END):  # type: ignore
-        next_month = (current_date + pd.offsets.MonthEnd(1)) + pd.Timedelta(days=1)
+        next_month: pd.Timestamp = cast(
+            pd.Timestamp,
+            (current_date + pd.offsets.MonthEnd(1)) + pd.Timedelta(days=1),
+        )
         logger.info(
             f"{TICKER} prices: retrieving records for {current_date.date()}--{next_month.date()}..."
         )
