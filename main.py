@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 
 import pandas as pd
@@ -8,7 +9,7 @@ from polygon import RESTClient
 from src.constants import DATE_END, DATE_START, TICKERS
 from src.utils import setup_logging, with_retry
 
-logger = setup_logging()
+logger = setup_logging(level=logging.DEBUG)
 
 
 API_KEY = os.getenv("POLYGON_API_KEY")
