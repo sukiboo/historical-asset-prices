@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 from logging.handlers import RotatingFileHandler
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
+import pandas as pd
 from polygon.exceptions import BadResponse
 from tenacity import (
     after_log,
@@ -58,6 +59,14 @@ def setup_logging(
 
     # Return the root logger so callers may do `logger = setup_logging()` safely
     return logging.getLogger()
+
+
+def to_timestamp(date_str: str) -> pd.Timestamp:
+    """Convert date string to Timestamp, validated and type-narrowed."""
+    ts = pd.Timestamp(date_str)
+    if ts is pd.NaT:
+        raise ValueError(f"Invalid date: {date_str}")
+    return cast(pd.Timestamp, ts)
 
 
 def with_retry(
