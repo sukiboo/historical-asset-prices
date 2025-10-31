@@ -20,6 +20,7 @@ class StockPrices:
         self.ticker = ticker
         self.date_start = date_start
         self.date_end = date_end
+        self.data_dir = f"data/{self.ticker}"
 
     def __str__(self):
         return (
@@ -29,45 +30,56 @@ class StockPrices:
         )
 
     def retrieve_prices(self):
-        os.makedirs(f"data/{self.ticker}", exist_ok=True)
+        os.makedirs(self.data_dir, exist_ok=True)
+        self.fetch_aggs = with_retry(self.client.list_aggs)
+
         current_date = self.date_start
-        fetch_aggs = with_retry(self.client.list_aggs)
+        while current_date <= self.date_end:
+            next_month = (current_date.to_period("M") + 1).to_timestamp()
 
-        while current_date <= self.date_end:  # type: ignore
-            next_month = (current_date + pd.offsets.MonthEnd(1)) + pd.Timedelta(days=1)
-            logger.info(
-                f"{self.ticker} prices: retrieving records for "
-                f"{current_date.date()}--{next_month.date()}..."
-            )
-
-            aggs = fetch_aggs(
-                ticker=self.ticker,
-                multiplier=1,
-                timespan="minute",
-                from_=current_date.strftime("%Y-%m-%d"),
-                to=next_month.strftime("%Y-%m-%d"),
-                adjusted=True,
-                sort="asc",
-                limit=50000,
-            )
-            if aggs:
+            if os.path.exists(f"{self.data_dir}/{current_date.strftime('%Y-%m')}.parquet"):
                 logger.info(
-                    f"{self.ticker} prices: retrieved {len(aggs)} records "
-                    + f"for {current_date.date()}--{next_month.date()}"
+                    f"{self.ticker} prices: skipping records for "
+                    f"{current_date.date()}--{next_month.date()}"
                 )
 
-                df = pd.DataFrame([a.__dict__ for a in aggs])
-                if "timestamp" in df.columns and pd.api.types.is_numeric_dtype(df["timestamp"]):
-                    df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
-                df.to_parquet(
-                    f"data/{self.ticker}/{current_date.strftime('%Y-%m')}.parquet", index=False
-                )
             else:
-                logger.warning(
-                    f"{self.ticker} prices: no records returned "
-                    + f"for {current_date.date()}--{next_month.date()}"
+                logger.info(
+                    f"{self.ticker} prices: retrieving records for "
+                    f"{current_date.date()}--{next_month.date()}..."
                 )
+
+                aggs = self.retrieve_prices_interval(current_date, next_month)
+                if aggs:
+                    logger.info(
+                        f"{self.ticker} prices: retrieved {len(aggs)} records "
+                        + f"for {current_date.date()}--{next_month.date()}"
+                    )
+                    self.save_prices_monthly(aggs, current_date)
+                else:
+                    logger.warning(
+                        f"{self.ticker} prices: no records returned "
+                        + f"for {current_date.date()}--{next_month.date()}"
+                    )
 
             current_date = next_month
 
-        logger.info(f"Retrieved {len(df)} rows for {self.ticker}\n")
+    def retrieve_prices_interval(
+        self, start_date: pd.Timestamp, end_date: pd.Timestamp
+    ) -> list[object]:
+        return self.fetch_aggs(
+            ticker=self.ticker,
+            multiplier=1,
+            timespan="minute",
+            from_=start_date.strftime("%Y-%m-%d"),
+            to=end_date.strftime("%Y-%m-%d"),
+            adjusted=True,
+            sort="asc",
+            limit=50000,
+        )
+
+    def save_prices_monthly(self, aggs: list[object], start_date: pd.Timestamp):
+        df = pd.DataFrame([a.__dict__ for a in aggs])
+        if "timestamp" in df.columns and pd.api.types.is_numeric_dtype(df["timestamp"]):
+            df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+        df.to_parquet(f"{self.data_dir}/{start_date.strftime('%Y-%m')}.parquet", index=False)

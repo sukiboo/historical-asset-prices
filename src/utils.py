@@ -63,9 +63,12 @@ def setup_logging(
 
 def to_timestamp(date_str: str) -> pd.Timestamp:
     """Convert date string to Timestamp, validated and type-narrowed."""
-    ts = pd.Timestamp(date_str)
+    try:
+        ts = pd.Timestamp(date_str)
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Invalid date format or value: {date_str!r}") from e
     if ts is pd.NaT:
-        raise ValueError(f"Invalid date: {date_str}")
+        raise ValueError(f"Invalid date: {date_str!r} (parsed as NaT)")
     return cast(pd.Timestamp, ts)
 
 
