@@ -17,7 +17,7 @@ class StockPrices:
         self, client: RESTClient, ticker: str, date_start: pd.Timestamp, date_end: pd.Timestamp
     ):
         self.client = client
-        self.ticker = ticker
+        self.ticker = ticker.upper()
         self.date_start = date_start
         self.date_end = date_end
         self.data_dir = f"data/{self.ticker}"
