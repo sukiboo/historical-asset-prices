@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 
-from polygon import RESTClient
+from massive import RESTClient
 
 from src.constants import DATE_END, DATE_START, TICKERS
 from src.prices import StockPrices
@@ -11,7 +11,7 @@ from src.utils import setup_logging, to_timestamp
 
 logger = setup_logging(level=logging.INFO)
 
-client = RESTClient(os.getenv("POLYGON_API_KEY"))
+client = RESTClient(os.getenv("MASSIVE_API_KEY"))
 
 
 logger.info(f"Retrieving prices for {TICKERS} from {DATE_START} to {DATE_END}")

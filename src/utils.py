@@ -5,7 +5,7 @@ from logging.handlers import RotatingFileHandler
 from typing import Any, Callable, cast
 
 import pandas as pd
-from polygon.exceptions import BadResponse
+from massive.exceptions import BadResponse
 from tenacity import (
     after_log,
     before_sleep_log,

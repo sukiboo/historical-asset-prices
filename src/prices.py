@@ -4,7 +4,7 @@ import logging
 import os
 
 import pandas as pd
-from polygon import RESTClient
+from massive import RESTClient
 
 from src.utils import with_retry
 
