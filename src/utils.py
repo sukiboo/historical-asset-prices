@@ -5,12 +5,11 @@ from logging.handlers import RotatingFileHandler
 from typing import Any, Callable, cast
 
 import pandas as pd
-from massive.exceptions import BadResponse
 from tenacity import (
     after_log,
     before_sleep_log,
     retry,
-    retry_if_exception_type,
+    retry_if_exception,
     stop_after_attempt,
     wait_exponential,
 )
@@ -21,30 +20,31 @@ from src.constants import MAX_DELAY, MAX_RETRIES, MIN_DELAY
 
 def setup_logging(
     *,
-    level: int = logging.INFO,
+    console_level: int = logging.INFO,
+    file_level: int = logging.DEBUG,
     log_file: str = "logs.log",
     max_bytes: int = 10 * 1024 * 1024,
     backup_count: int = 5,
 ) -> logging.Logger:
     """Configure root logging once and return the application logger.
 
-    This sets handlers on the root logger so that any module using
+    Handlers are attached to the root logger so that any module using
     `logging.getLogger(__name__)` inherits the same configuration.
+    The console and file levels can be tuned independently.
     Subsequent calls are idempotent (won't add duplicate handlers).
     """
     root_logger = logging.getLogger()
 
     if not getattr(root_logger, "_app_logging_configured", False):
-        root_logger.setLevel(level)
-
         formatter = logging.Formatter(fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        root_logger.setLevel(min(console_level, file_level))
 
         console_handler = logging.StreamHandler()
-        console_handler.setLevel(level)
+        console_handler.setLevel(console_level)
         console_handler.setFormatter(formatter)
 
         file_handler = RotatingFileHandler(log_file, maxBytes=max_bytes, backupCount=backup_count)
-        file_handler.setLevel(level)
+        file_handler.setLevel(file_level)
         file_handler.setFormatter(formatter)
 
         # Clear pre-existing basicConfig handlers (if any) to avoid duplicates
@@ -90,7 +90,9 @@ def with_retry(
     @retry(
         stop=stop_after_attempt(max_retries),
         wait=wait_exponential(min=min_delay, max=max_delay),
-        retry=retry_if_exception_type((BadResponse, MaxRetryError)),
+        retry=retry_if_exception(
+            lambda exc: isinstance(exc, MaxRetryError) and "too many 429" in str(exc).lower()
+        ),
         before_sleep=before_sleep_log(effective_logger, logging.DEBUG),
         after=after_log(effective_logger, logging.DEBUG),
     )

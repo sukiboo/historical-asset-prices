@@ -6,10 +6,10 @@ import os
 from massive import RESTClient
 
 from src.constants import DATE_END, DATE_START, TICKERS
-from src.prices import StockPrices
+from src.prices import OptionPrices, StockPrices
 from src.utils import setup_logging, to_timestamp
 
-logger = setup_logging(level=logging.INFO)
+logger = setup_logging(console_level=logging.INFO, file_level=logging.DEBUG)
 
 client = RESTClient(os.getenv("MASSIVE_API_KEY"))
 
@@ -21,3 +21,7 @@ for ticker in TICKERS:
     stock_prices = StockPrices(client, ticker, date_start, date_end)
     stock_prices.retrieve_prices()
     print(stock_prices)
+
+    option_prices = OptionPrices(client, ticker, date_start, date_end)
+    option_prices.retrieve_prices()
+    print(option_prices)
