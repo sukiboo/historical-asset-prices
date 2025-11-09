@@ -29,11 +29,20 @@ class OptionPrices:
         )
 
     def retrieve_prices(self) -> None:
-        os.makedirs(self.data_dir, exist_ok=True)
         self.fetch_aggs = with_retry(get_file_from_s3)
 
         current_day: pd.Timestamp = self.date_start
         while current_day < self.date_end:
+            if all(
+                os.path.exists(
+                    f"{self.data_dir}/{ticker}/{current_day.strftime('%Y-%m-%d')}.parquet"
+                )
+                for ticker in self.tickers
+            ):
+                logger.info(f"Option prices: skipping {current_day.date()}...")
+                current_day = cast(pd.Timestamp, current_day + pd.Timedelta(days=1))
+                continue
+
             s3_path = (
                 f"us_options_opra/minute_aggs_v1/"
                 f'{current_day.strftime("%Y/%m")}/'

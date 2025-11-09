@@ -139,7 +139,6 @@ def get_file_from_s3(
         result = pd.read_csv(
             response["Body"], compression="gzip" if object_key.endswith(".gz") else None
         )
-        print("\nutils", result, "\n")
 
         if not isinstance(result, pd.DataFrame):
             raise ValueError(f"Expected DataFrame but got {type(result)}")
