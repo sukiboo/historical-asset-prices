@@ -4,7 +4,7 @@ A Python script to retrieve historical stock and option prices at minute interva
 
 ## Overview
 
-This repository retrieves historical stock price data for specified tickers at a minute interval and saves the data to the `/data` directory, organized by ticker and month in Parquet format.
+This repository retrieves historical stock and options price data for specified tickers at a minute interval and saves the data to the `/data` directory, organized by ticker and month in Parquet format.
 
 ## Setup
 
@@ -28,19 +28,28 @@ python main.py
 ```
 
 The script will:
-- Retrieve minute-level stock prices for all configured tickers
+- Retrieve minute-level stock and option prices for all configured tickers
 - Skip months that already have data files (idempotent)
-- Save data as Parquet files in `data/{TICKER}/{YYYY-MM}.parquet`
-
-(options prices are not yet implemented but I'm working on it)
+- Save stock prices as Parquet files in `data/stocks/{TICKER}/{YYYY-MM}.parquet`
+- Save option prices as Parquet files in `data/options/{TICKER}/{YYYY-MM}.parquet`
 
 ## Data Structure
 
 Data is organized in the `data/` directory:
 ```
 data/
-  {TICKER}/
-    YYYY-MM.parquet
+├── stocks/
+│   └── TICKER/
+│       └── YYYY-MM.parquet
+└── options/
+    └── TICKER/
+        └── YYYY-MM.parquet
 ```
 
 Each Parquet file contains minute-level price data for that ticker and month.
+
+## Data Availability
+
+Stock prices are retrieved via the [Custom Bars REST API](https://massive.com/docs/rest/stocks/aggregates/custom-bars), which provides two years of historical data on a free plan.
+
+Option prices are retrieved via the [Minute Aggregates Flat Files](https://massive.com/docs/flat-files/options/minute-aggregates), which requires the Options Starter plan for the two years of historical data.
