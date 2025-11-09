@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import cast
 
 import pandas as pd
 from massive import RESTClient
 
-from src.utils import with_retry
+from src.utils import aggs_to_df, save_daily_prices, with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -14,72 +15,56 @@ logger = logging.getLogger(__name__)
 class StockPrices:
 
     def __init__(
-        self, client: RESTClient, ticker: str, date_start: pd.Timestamp, date_end: pd.Timestamp
-    ):
-        self.client = client
-        self.ticker = ticker.upper()
+        self, tickers: list[str], date_start: pd.Timestamp, date_end: pd.Timestamp
+    ) -> None:
+        self.client = RESTClient(os.getenv("MASSIVE_API_KEY"))
+        self.tickers = [ticker.upper() for ticker in tickers]
         self.date_start = date_start
         self.date_end = date_end
-        self.data_dir = f"data/stocks/{self.ticker}"
+        self.data_dir = f"data/stocks"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return (
-            f"StockPrices(ticker={self.ticker}, "
+            f"StockPrices(tickers={self.tickers}, "
             f"date_start={self.date_start.date()}, "
             f"date_end={self.date_end.date()})"
         )
 
-    def retrieve_prices(self):
-        os.makedirs(self.data_dir, exist_ok=True)
-        self.fetch_aggs = with_retry(self.client.list_aggs)
+    def retrieve_prices(self) -> None:
+        self.fetch_aggs = with_retry(aggs_to_df(self.client.list_aggs, logger))
 
-        current_date = self.date_start
-        while current_date < self.date_end:
-            next_month = (current_date.to_period("M") + 1).to_timestamp()
+        current_day: pd.Timestamp = self.date_start
+        while current_day < self.date_end:
+            next_day = cast(pd.Timestamp, current_day + pd.Timedelta(days=1))
 
-            if os.path.exists(f"{self.data_dir}/{current_date.strftime('%Y-%m')}.parquet"):
-                logger.info(
-                    f"{self.ticker} stock prices: skipping records for "
-                    f"{current_date.date()}--{next_month.date()}"
-                )
-
-            else:
-                logger.info(
-                    f"{self.ticker} stock prices: retrieving records for "
-                    f"{current_date.date()}--{next_month.date()}..."
-                )
-
-                aggs = self.retrieve_prices_interval(current_date, next_month)
-                if aggs:
-                    logger.info(
-                        f"{self.ticker} stock prices: retrieved {len(aggs)} records "
-                        + f"for {current_date.date()}--{next_month.date()}"
-                    )
-                    self.save_prices_monthly(aggs, current_date)
-                else:
-                    logger.warning(
-                        f"{self.ticker} stock prices: no records returned "
-                        + f"for {current_date.date()}--{next_month.date()}"
+            for ticker in self.tickers:
+                if not self.ticker_has_stock_data(ticker, current_day):
+                    stock_prices = self.fetch_aggs(
+                        ticker=ticker,
+                        multiplier=1,
+                        timespan="minute",
+                        from_=current_day.strftime("%Y-%m-%d"),
+                        to=current_day.strftime("%Y-%m-%d"),
+                        adjusted=True,
+                        sort="asc",
+                        limit=10000,
                     )
 
-            current_date = next_month
+                    if stock_prices is not None and not stock_prices.empty:
+                        self.parse_stock_prices(stock_prices, current_day, ticker)
 
-    def retrieve_prices_interval(
-        self, start_date: pd.Timestamp, end_date: pd.Timestamp
-    ) -> list[object]:
-        return self.fetch_aggs(
-            ticker=self.ticker,
-            multiplier=1,
-            timespan="minute",
-            from_=start_date.strftime("%Y-%m-%d"),
-            to=end_date.strftime("%Y-%m-%d"),
-            adjusted=True,
-            sort="asc",
-            limit=50000,
-        )
+            current_day = next_day
 
-    def save_prices_monthly(self, aggs: list[object], start_date: pd.Timestamp):
-        df = pd.DataFrame([a.__dict__ for a in aggs])
-        if "timestamp" in df.columns and pd.api.types.is_numeric_dtype(df["timestamp"]):
-            df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
-        df.to_parquet(f"{self.data_dir}/{start_date.strftime('%Y-%m')}.parquet", index=False)
+    def ticker_has_stock_data(self, ticker: str, current_day: pd.Timestamp) -> bool:
+        if os.path.exists(f"{self.data_dir}/{ticker}/{current_day.strftime('%Y-%m-%d')}.parquet"):
+            logger.info(f"Stock prices: skipping {ticker} records for {current_day.date()}...")
+            return True
+        else:
+            return False
+
+    def parse_stock_prices(
+        self, stock_prices: pd.DataFrame, current_day: pd.Timestamp, ticker: str
+    ) -> None:
+        # TODO: parse stock prices
+        file_path = f"{self.data_dir}/{ticker}/{current_day.strftime('%Y-%m-%d')}.parquet"
+        save_daily_prices(stock_prices, file_path)

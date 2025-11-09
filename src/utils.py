@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from logging.handlers import RotatingFileHandler
 from typing import Any, Callable, cast
 
@@ -108,6 +109,54 @@ def with_retry(
     return wrapper
 
 
+def save_daily_prices(df: pd.DataFrame, file_path: str) -> None:
+    dir_path = os.path.dirname(file_path)
+    if dir_path:
+        os.makedirs(dir_path, exist_ok=True)
+    df.to_parquet(file_path, index=False)
+
+
+def aggs_to_df(
+    func: Callable[..., Any],
+    logger: logging.Logger,
+) -> Callable[..., pd.DataFrame | None]:
+    """Wrapper that converts list_aggs result to DataFrame with logging.
+
+    Args:
+        func: The function to wrap (e.g., client.list_aggs)
+        logger: Logger instance to use for logging
+
+    Returns:
+        Wrapped function that returns DataFrame or None
+    """
+
+    def wrapper(*args: Any, **kwargs: Any) -> pd.DataFrame | None:
+        ticker = kwargs.get("ticker", args[0] if args else "unknown")
+        from_date = kwargs.get("from_", "")
+
+        logger.info(f"Retrieving {ticker} records for {from_date}...")
+
+        aggs = func(*args, **kwargs)
+
+        if not aggs:
+            logger.warning(f"No records returned for {ticker} on {from_date}")
+            return None
+
+        df = pd.DataFrame([agg.__dict__ for agg in aggs])
+
+        # TODO: move to stock_prices.py
+        # Convert timestamp from milliseconds to datetime if present
+        # Polygon API returns Unix timestamps in UTC, convert to timezone-aware ET
+        if "timestamp" in df.columns and pd.api.types.is_numeric_dtype(df["timestamp"]):
+            df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms", utc=True)
+            df["timestamp"] = df["timestamp"].dt.tz_convert("America/New_York")
+
+        logger.info(f"Retrieved {len(df)} records for {ticker} on {from_date}")
+        return df
+
+    return wrapper
+
+
 def get_file_from_s3(
     object_key: str,
     bucket_name: str,
@@ -145,6 +194,15 @@ def get_file_from_s3(
 
         if result.empty:
             raise ValueError(f"Data from '{object_key}' is empty")
+
+        # TODO: move to options_prices.py
+        # Convert timestamp from nanoseconds to timezone-aware datetime if present
+        # Options flat files use 'window_start' column with Unix timestamps in nanoseconds (UTC)
+        if "window_start" in result.columns and pd.api.types.is_numeric_dtype(
+            result["window_start"]
+        ):
+            result["window_start"] = pd.to_datetime(result["window_start"], unit="ns", utc=True)
+            result["window_start"] = result["window_start"].dt.tz_convert("America/New_York")
 
         logger.debug(f"Successfully downloaded '{object_key}' ({len(result)} rows)")
         return result
