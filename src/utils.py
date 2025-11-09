@@ -4,7 +4,10 @@ import logging
 from logging.handlers import RotatingFileHandler
 from typing import Any, Callable, cast
 
+import boto3
 import pandas as pd
+from botocore.config import Config
+from botocore.exceptions import ClientError
 from tenacity import (
     after_log,
     before_sleep_log,
@@ -98,8 +101,59 @@ def with_retry(
     )
     def wrapper(*args: Any, **kwargs: Any):
         result = func(*args, **kwargs)
-        if hasattr(result, "__iter__") and not isinstance(result, (str, bytes)):
+        if hasattr(result, "__iter__") and not isinstance(result, (str, bytes, pd.DataFrame)):
             return list(result)
         return result
 
     return wrapper
+
+
+def get_file_from_s3(
+    object_key: str,
+    bucket_name: str,
+    logger: logging.Logger,
+    aws_access_key_id: str | None = None,
+    aws_secret_access_key: str | None = None,
+) -> pd.DataFrame | None:
+    """
+    Get a minute aggregates flat file from S3:
+    - Stocks: https://massive.com/docs/flat-files/stocks/minute-aggregates
+    - Options: https://massive.com/docs/flat-files/options/minute-aggregates
+    """
+    if not aws_access_key_id or not aws_secret_access_key:
+        raise ValueError("AWS credentials are missing!")
+
+    session = boto3.Session(
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_secret_access_key,
+    )
+    s3 = session.client(
+        "s3",
+        endpoint_url="https://files.massive.com",
+        config=Config(signature_version="s3v4"),
+    )
+
+    logger.debug(f"Downloading '{object_key}' from '{bucket_name}'...")
+    try:
+        response = s3.get_object(Bucket=bucket_name, Key=object_key)
+        result = pd.read_csv(
+            response["Body"], compression="gzip" if object_key.endswith(".gz") else None
+        )
+        print("\nutils", result, "\n")
+
+        if not isinstance(result, pd.DataFrame):
+            raise ValueError(f"Expected DataFrame but got {type(result)}")
+
+        if result.empty:
+            raise ValueError(f"Data from '{object_key}' is empty")
+
+        logger.debug(f"Successfully downloaded '{object_key}' ({len(result)} rows)")
+        return result
+
+    except ClientError as e:
+        if e.response.get("Error", {}).get("Code") == "NoSuchKey":
+            logger.debug(f"File not found: '{object_key}'")
+            return None
+        raise RuntimeError(f"Failed to download '{object_key}': {e}") from e
+    except (pd.errors.EmptyDataError, pd.errors.ParserError) as e:
+        raise ValueError(f"Failed to parse '{object_key}': {e}") from e
