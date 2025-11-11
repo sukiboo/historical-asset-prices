@@ -2,7 +2,7 @@ from __future__ import annotations
 
 TICKERS = ["AAPL", "MSFT"]
 DATE_START = "2024-01-01"
-DATE_END = "2024-01-05"
+DATE_END = "2024-01-03"
 
 MIN_DELAY = 10
 MAX_DELAY = 600

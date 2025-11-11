@@ -133,26 +133,25 @@ def aggs_to_df(
     def wrapper(*args: Any, **kwargs: Any) -> pd.DataFrame | None:
         ticker = kwargs.get("ticker", args[0] if args else "unknown")
         from_date = kwargs.get("from_", "")
+        to_date = kwargs.get("to", "")
 
-        logger.info(f"Retrieving {ticker} records for {from_date}...")
-
+        logger.info(f"Retrieving {ticker} records from {from_date} to {to_date}...")
         aggs = func(*args, **kwargs)
 
         if not aggs:
-            logger.warning(f"No records returned for {ticker} on {from_date}")
+            logger.warning(f"No records returned for {ticker} from {from_date} to {to_date}")
             return None
+        else:
+            df = pd.DataFrame([agg.__dict__ for agg in aggs])
 
-        df = pd.DataFrame([agg.__dict__ for agg in aggs])
-
-        # TODO: move to stock_prices.py
-        # Convert timestamp from milliseconds to datetime if present
-        # Polygon API returns Unix timestamps in UTC, convert to timezone-aware ET
-        if "timestamp" in df.columns and pd.api.types.is_numeric_dtype(df["timestamp"]):
-            df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms", utc=True)
-            df["timestamp"] = df["timestamp"].dt.tz_convert("America/New_York")
-
-        logger.info(f"Retrieved {len(df)} records for {ticker} on {from_date}")
-        return df
+            if df.empty:
+                logger.warning(f"DataFrame is empty for {ticker} from {from_date} to {to_date}")
+                return None
+            else:
+                logger.info(
+                    f"Retrieved {len(df)} records for {ticker} from {from_date} to {to_date}"
+                )
+                return df
 
     return wrapper
 
@@ -191,21 +190,11 @@ def get_file_from_s3(
 
         if not isinstance(result, pd.DataFrame):
             raise ValueError(f"Expected DataFrame but got {type(result)}")
-
-        if result.empty:
+        elif result.empty:
             raise ValueError(f"Data from '{object_key}' is empty")
-
-        # TODO: move to options_prices.py
-        # Convert timestamp from nanoseconds to timezone-aware datetime if present
-        # Options flat files use 'window_start' column with Unix timestamps in nanoseconds (UTC)
-        if "window_start" in result.columns and pd.api.types.is_numeric_dtype(
-            result["window_start"]
-        ):
-            result["window_start"] = pd.to_datetime(result["window_start"], unit="ns", utc=True)
-            result["window_start"] = result["window_start"].dt.tz_convert("America/New_York")
-
-        logger.debug(f"Successfully downloaded '{object_key}' ({len(result)} rows)")
-        return result
+        else:
+            logger.debug(f"Successfully downloaded '{object_key}' ({len(result)} rows)")
+            return result
 
     except ClientError as e:
         if e.response.get("Error", {}).get("Code") == "NoSuchKey":

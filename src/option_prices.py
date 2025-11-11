@@ -47,7 +47,7 @@ class OptionPrices:
                     aws_secret_access_key=os.getenv("MASSIVE_API_KEY"),
                 )
 
-                if option_contracts is not None and not option_contracts.empty:
+                if option_contracts is not None:
                     self.parse_option_contracts(option_contracts, current_day)
 
             current_day = cast(pd.Timestamp, current_day + pd.Timedelta(days=1))
@@ -63,7 +63,19 @@ class OptionPrices:
             return False
 
     def parse_option_contracts(self, option_contracts: pd.DataFrame, current_day: pd.Timestamp):
+        # Convert window_start from nanoseconds to timestamp column and make it first column
+        # Options flat files use 'window_start' column with Unix timestamps in nanoseconds (UTC)
+        option_contracts["timestamp"] = pd.to_datetime(
+            option_contracts["window_start"], unit="ns", utc=True
+        ).dt.tz_convert("America/New_York")
+        option_contracts = option_contracts.drop(columns=["window_start"])
+        option_contracts = option_contracts.set_index("timestamp").sort_index().reset_index()
+
         for ticker in self.tickers:
-            # TODO: extract tickers from option_contracts
+            ticker_options = cast(
+                pd.DataFrame,
+                option_contracts[option_contracts["ticker"].str.startswith(f"O:{ticker}")],
+            )
+
             file_path = f"{self.data_dir}/{ticker}/{current_day.strftime('%Y-%m-%d')}.parquet"
-            save_daily_prices(option_contracts, file_path)
+            save_daily_prices(ticker_options, file_path)

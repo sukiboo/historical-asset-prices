@@ -50,7 +50,7 @@ class StockPrices:
                         limit=10000,
                     )
 
-                    if stock_prices is not None and not stock_prices.empty:
+                    if stock_prices is not None:
                         self.parse_stock_prices(stock_prices, current_day, ticker)
 
             current_day = next_day
@@ -65,6 +65,13 @@ class StockPrices:
     def parse_stock_prices(
         self, stock_prices: pd.DataFrame, current_day: pd.Timestamp, ticker: str
     ) -> None:
-        # TODO: parse stock prices
+
+        # Convert timestamp from milliseconds to datetime and make it first column
+        # Polygon API returns Unix timestamps in UTC, convert to timezone-aware ET
+        stock_prices["timestamp"] = pd.to_datetime(
+            stock_prices["timestamp"], unit="ms", utc=True
+        ).dt.tz_convert("America/New_York")
+        stock_prices = stock_prices.set_index("timestamp").sort_index().reset_index()
+
         file_path = f"{self.data_dir}/{ticker}/{current_day.strftime('%Y-%m-%d')}.parquet"
         save_daily_prices(stock_prices, file_path)
