@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 TICKERS = ["AAPL", "MSFT"]
 DATE_START = "2024-01-01"
 DATE_END = "2024-01-03"

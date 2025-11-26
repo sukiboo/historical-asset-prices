@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import logging
 import os
 from logging.handlers import RotatingFileHandler
@@ -57,6 +55,12 @@ def setup_logging(
 
         root_logger.addHandler(console_handler)
         root_logger.addHandler(file_handler)
+
+        # Quiet noisy third-party libraries
+        logging.getLogger("botocore").setLevel(logging.WARNING)
+        logging.getLogger("boto3").setLevel(logging.WARNING)
+        logging.getLogger("urllib3").setLevel(logging.WARNING)
+        logging.getLogger("s3transfer").setLevel(logging.WARNING)
 
         # Mark as configured to prevent duplicate handler additions
         setattr(root_logger, "_app_logging_configured", True)

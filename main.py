@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import logging
 
 from src.constants import DATE_END, DATE_START, TICKERS
