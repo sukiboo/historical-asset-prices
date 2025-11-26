@@ -76,6 +76,9 @@ class OptionPrices:
                 pd.DataFrame,
                 option_contracts[option_contracts["ticker"].str.startswith(f"O:{ticker}")],
             )
+            ticker_options = ticker_options[
+                ["timestamp", "ticker", "open", "close", "low", "high", "volume"]
+            ]
 
             file_path = f"{self.data_dir}/{ticker}/{current_day.strftime('%Y-%m-%d')}.parquet"
             save_daily_prices(ticker_options, file_path)

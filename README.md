@@ -13,9 +13,10 @@ This repository retrieves historical stock and options price data for specified 
    pip install -r requirements.txt
    ```
 
-2. Set your Massive API key:
+2. Set Massive API credentials:
    ```bash
    export MASSIVE_API_KEY=your_api_key_here
+   export MASSIVE_AWS_ACCESS_KEY_ID=your_aws_access_key_id_here
    ```
 
 3. Configure tickers and date range in `src/constants.py`

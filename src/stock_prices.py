@@ -68,10 +68,14 @@ class StockPrices:
 
         # Convert timestamp from milliseconds to datetime and make it first column
         # Polygon API returns Unix timestamps in UTC, convert to timezone-aware ET
+        stock_prices["ticker"] = ticker
         stock_prices["timestamp"] = pd.to_datetime(
             stock_prices["timestamp"], unit="ms", utc=True
         ).dt.tz_convert("America/New_York")
         stock_prices = stock_prices.set_index("timestamp").sort_index().reset_index()
+        stock_prices = stock_prices[
+            ["timestamp", "ticker", "open", "close", "low", "high", "volume"]
+        ]
 
         file_path = f"{self.data_dir}/{ticker}/{current_day.strftime('%Y-%m-%d')}.parquet"
         save_daily_prices(stock_prices, file_path)
