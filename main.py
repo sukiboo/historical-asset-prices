@@ -5,12 +5,9 @@ from src.option_prices import OptionPrices
 from src.stock_prices import StockPrices
 from src.utils import setup_logging, to_timestamp
 
-logger = setup_logging(console_level=logging.WARNING, file_level=logging.DEBUG)
+logger = setup_logging(console_level=logging.INFO, file_level=logging.DEBUG)
 
 
-# TODO: parse stocks/options
-# TODO: clean up logging
-logger.info(f"Retrieving prices for {TICKERS} from {DATE_START} to {DATE_END}")
 date_start = to_timestamp(DATE_START)
 date_end = to_timestamp(DATE_END)
 

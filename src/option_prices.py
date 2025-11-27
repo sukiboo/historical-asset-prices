@@ -53,39 +53,46 @@ class OptionPrices:
                         aws_secret_access_key=os.getenv("MASSIVE_API_KEY"),
                     )
 
-                    if option_contracts is not None:
-                        self.parse_option_contracts(option_contracts, current_day)
+                    # Always parse and save, even if empty (for weekends/holidays)
+                    self.parse_option_contracts(option_contracts, current_day)
 
                 pbar.update(1)
                 current_day = cast(pd.Timestamp, current_day + pd.Timedelta(days=1))
 
     def all_tickers_have_option_data(self, current_day: pd.Timestamp) -> bool:
+        date_str = current_day.strftime("%Y-%m-%d")
         if all(
-            os.path.exists(f"{self.data_dir}/{ticker}/{current_day.strftime('%Y-%m-%d')}.parquet")
+            os.path.exists(f"{self.data_dir}/{ticker}/{date_str}.parquet")
+            or os.path.exists(f"{self.data_dir}/{ticker}/{date_str}.empty")
             for ticker in self.tickers
         ):
             logger.debug(f"Option prices: skipping records for {current_day.date()}...")
             return True
-        else:
-            return False
+        return False
 
     def parse_option_contracts(self, option_contracts: pd.DataFrame, current_day: pd.Timestamp):
-        # Convert window_start from nanoseconds to timestamp column and make it first column
+        # Handle empty DataFrame (weekends/holidays)
+        if option_contracts.empty:
+            for ticker in self.tickers:
+                marker_file = f"{self.data_dir}/{ticker}/{current_day.strftime('%Y-%m-%d')}.empty"
+                os.makedirs(os.path.dirname(marker_file), exist_ok=True)
+                open(marker_file, "a").close()
+            return
+
+        # Convert window_start from nanoseconds to timestamp
         # Options flat files use 'window_start' column with Unix timestamps in nanoseconds (UTC)
         option_contracts["timestamp"] = pd.to_datetime(
             option_contracts["window_start"], unit="ns", utc=True
         ).dt.tz_convert("America/New_York")
         option_contracts = option_contracts.drop(columns=["window_start"])
-        option_contracts = option_contracts.set_index("timestamp").sort_index().reset_index()
+        # Set timestamp as index and sort
+        option_contracts = option_contracts.set_index("timestamp").sort_index()
 
         for ticker in self.tickers:
-            ticker_options = cast(
-                pd.DataFrame,
-                option_contracts[option_contracts["ticker"].str.startswith(f"O:{ticker}")],
-            )
-            ticker_options = ticker_options[
-                ["timestamp", "ticker", "open", "close", "low", "high", "volume"]
-            ]
+            ticker_options = option_contracts[
+                option_contracts["ticker"].str.startswith(f"O:{ticker}")
+            ].copy()
+            ticker_options = ticker_options[["ticker", "open", "close", "low", "high", "volume"]]
 
             file_path = f"{self.data_dir}/{ticker}/{current_day.strftime('%Y-%m-%d')}.parquet"
             save_daily_prices(ticker_options, file_path)

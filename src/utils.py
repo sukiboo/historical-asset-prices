@@ -117,13 +117,14 @@ def save_daily_prices(df: pd.DataFrame, file_path: str) -> None:
     dir_path = os.path.dirname(file_path)
     if dir_path:
         os.makedirs(dir_path, exist_ok=True)
-    df.to_parquet(file_path, index=False)
+    # assume index is the timestamp
+    df.to_parquet(file_path, index=True)
 
 
 def aggs_to_df(
     func: Callable[..., Any],
     logger: logging.Logger,
-) -> Callable[..., pd.DataFrame | None]:
+) -> Callable[..., pd.DataFrame]:
     """Wrapper that converts list_aggs result to DataFrame with logging.
 
     Args:
@@ -134,7 +135,7 @@ def aggs_to_df(
         Wrapped function that returns DataFrame or None
     """
 
-    def wrapper(*args: Any, **kwargs: Any) -> pd.DataFrame | None:
+    def wrapper(*args: Any, **kwargs: Any) -> pd.DataFrame:
         ticker = kwargs.get("ticker", args[0] if args else "unknown")
         from_date = kwargs.get("from_", "")
         to_date = kwargs.get("to", "")
@@ -144,18 +145,16 @@ def aggs_to_df(
 
         if not aggs:
             logger.debug(f"No records returned for {ticker} from {from_date} to {to_date}")
-            return None
-        else:
-            df = pd.DataFrame([agg.__dict__ for agg in aggs])
+            return pd.DataFrame()
 
-            if df.empty:
-                logger.debug(f"DataFrame is empty for {ticker} from {from_date} to {to_date}")
-                return None
-            else:
-                logger.debug(
-                    f"Retrieved {len(df)} records for {ticker} from {from_date} to {to_date}"
-                )
-                return df
+        df = pd.DataFrame([agg.__dict__ for agg in aggs])
+
+        if df.empty:
+            logger.debug(f"DataFrame is empty for {ticker} from {from_date} to {to_date}")
+            return pd.DataFrame()
+
+        logger.debug(f"Retrieved {len(df)} records for {ticker} from {from_date} to {to_date}")
+        return df
 
     return wrapper
 
@@ -166,11 +165,13 @@ def get_file_from_s3(
     logger: logging.Logger,
     aws_access_key_id: str | None = None,
     aws_secret_access_key: str | None = None,
-) -> pd.DataFrame | None:
+) -> pd.DataFrame:
     """
     Get a minute aggregates flat file from S3:
     - Stocks: https://massive.com/docs/flat-files/stocks/minute-aggregates
     - Options: https://massive.com/docs/flat-files/options/minute-aggregates
+
+    Returns empty DataFrame if file doesn't exist (weekends/holidays).
     """
     if not aws_access_key_id or not aws_secret_access_key:
         raise ValueError("AWS credentials are missing!")
@@ -195,7 +196,8 @@ def get_file_from_s3(
         if not isinstance(result, pd.DataFrame):
             raise ValueError(f"Expected DataFrame but got {type(result)}")
         elif result.empty:
-            raise ValueError(f"Data from '{object_key}' is empty")
+            logger.debug(f"Data from '{object_key}' is empty")
+            return pd.DataFrame()
         else:
             logger.debug(f"Successfully downloaded '{object_key}' ({len(result)} rows)")
             return result
@@ -203,7 +205,8 @@ def get_file_from_s3(
     except ClientError as e:
         if e.response.get("Error", {}).get("Code") == "NoSuchKey":
             logger.debug(f"File not found: '{object_key}'")
-            return None
+            return pd.DataFrame()
         raise RuntimeError(f"Failed to download '{object_key}': {e}") from e
     except (pd.errors.EmptyDataError, pd.errors.ParserError) as e:
-        raise ValueError(f"Failed to parse '{object_key}': {e}") from e
+        logger.debug(f"Failed to parse '{object_key}': {e}")
+        return pd.DataFrame()
