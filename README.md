@@ -40,25 +40,32 @@ python main.py
 ```
 
 The script will:
-- Retrieve minute-level stock and option prices for all configured tickers
+- Download daily flat files from S3 containing all tickers (cached in `data/files/`)
+- Extract and save per-ticker data as Parquet files (in `data/prices/`)
 - Skip days that already have data files (idempotent)
-- Save stock prices as Parquet files in `data/stocks/{TICKER}/{YYYY-MM-DD}.parquet`
-- Save option prices as Parquet files in `data/options/{TICKER}/{YYYY-MM-DD}.parquet`
-- Create `.empty` marker files for days with no data (weekends/holidays) to avoid redundant API calls
+- Create `.empty` marker files for days with no data (weekends/holidays) to avoid redundant downloads
 
 ## Data Structure
 
 Data is organized in the `data/` directory:
 ```
 data/
-├── stocks/
-│   └── TICKER/
-│       ├── YYYY-MM-DD.parquet  (trading days with data)
-│       └── YYYY-MM-DD.empty    (weekends/holidays)
-└── options/
-    └── TICKER/
-        ├── YYYY-MM-DD.parquet  (trading days with data)
-        └── YYYY-MM-DD.empty    (weekends/holidays)
+├── files/                      # Cached raw flat files from S3
+│   ├── stocks/
+│   │   ├── YYYY-MM-DD.csv.gz        (daily flat file with all stocks)
+│   │   └── YYYY-MM-DD.csv.gz.empty  (marker for no data)
+│   └── options/
+│       ├── YYYY-MM-DD.csv.gz        (daily flat file with all options)
+│       └── YYYY-MM-DD.csv.gz.empty  (marker for no data)
+└── prices/                     # Extracted per-ticker data
+    ├── stocks/
+    │   └── TICKER/
+    │       ├── YYYY-MM-DD.parquet        (trading days with data)
+    │       └── YYYY-MM-DD.parquet.empty  (weekends/holidays)
+    └── options/
+        └── TICKER/
+            ├── YYYY-MM-DD.parquet        (trading days with data)
+            └── YYYY-MM-DD.parquet.empty  (weekends/holidays)
 ```
 
 Each Parquet file contains minute-level price data for that ticker and day, with the `timestamp` column as the index.
@@ -99,10 +106,10 @@ import pandas as pd
 
 # Load all stock data for a ticker (automatically sorted by timestamp)
 ticker = "SPY"
-stocks = pd.read_parquet(glob.glob(f"./data/stocks/{ticker}/*.parquet")).sort_index()
+stocks = pd.read_parquet(glob.glob(f"./data/prices/stocks/{ticker}/*.parquet")).sort_index()
 
 # Load all option data for a ticker
-options = pd.read_parquet(glob.glob(f"./data/options/{ticker}/*.parquet")).sort_index()
+options = pd.read_parquet(glob.glob(f"./data/prices/options/{ticker}/*.parquet")).sort_index()
 
 # Plot closing prices (timestamp is already the index)
 stocks["close"].plot(title=f"{ticker} Closing Price")
@@ -112,10 +119,8 @@ stocks["close"].plot(title=f"{ticker} Closing Price")
 
 ## Data Availability
 
-Stock prices are retrieved via the [Custom Bars REST API](https://massive.com/docs/rest/stocks/aggregates/custom-bars), which provides two years of historical data on a free plan.
-
-Option prices are retrieved via the [Minute Aggregates Flat Files](https://massive.com/docs/flat-files/options/minute-aggregates), which requires the Options Starter plan for the two years of historical data.
-
-## Sample Data
+Both stock and option prices are retrieved via [Minute Aggregates Flat Files](https://massive.com/docs/flat-files):
+- **Stocks**: [Stock Minute Aggregates](https://massive.com/docs/flat-files/stocks/minute-aggregates)
+- **Options**: [Option Minute Aggregates](https://massive.com/docs/flat-files/options/minute-aggregates)
 
 A sample dataset of pre-retrieved historical prices is available for download: [Dropbox Shared Folder](https://www.dropbox.com/scl/fo/2hfetk4k4n3z139jyqhb3/APwMO_XOVTuaObJUWAAzH5o?rlkey=gphwsbuo1knb4d5popfd29k4t&st=2nv3atqg&dl=0)

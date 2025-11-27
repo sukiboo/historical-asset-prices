@@ -121,44 +121,6 @@ def save_daily_prices(df: pd.DataFrame, file_path: str) -> None:
     df.to_parquet(file_path, index=True)
 
 
-def aggs_to_df(
-    func: Callable[..., Any],
-    logger: logging.Logger,
-) -> Callable[..., pd.DataFrame]:
-    """Wrapper that converts list_aggs result to DataFrame with logging.
-
-    Args:
-        func: The function to wrap (e.g., client.list_aggs)
-        logger: Logger instance to use for logging
-
-    Returns:
-        Wrapped function that returns DataFrame or None
-    """
-
-    def wrapper(*args: Any, **kwargs: Any) -> pd.DataFrame:
-        ticker = kwargs.get("ticker", args[0] if args else "unknown")
-        from_date = kwargs.get("from_", "")
-        to_date = kwargs.get("to", "")
-
-        logger.debug(f"Retrieving {ticker} records from {from_date} to {to_date}...")
-        aggs = func(*args, **kwargs)
-
-        if not aggs:
-            logger.debug(f"No records returned for {ticker} from {from_date} to {to_date}")
-            return pd.DataFrame()
-
-        df = pd.DataFrame([agg.__dict__ for agg in aggs])
-
-        if df.empty:
-            logger.debug(f"DataFrame is empty for {ticker} from {from_date} to {to_date}")
-            return pd.DataFrame()
-
-        logger.debug(f"Retrieved {len(df)} records for {ticker} from {from_date} to {to_date}")
-        return df
-
-    return wrapper
-
-
 def get_file_from_s3(
     object_key: str,
     bucket_name: str,
@@ -210,3 +172,39 @@ def get_file_from_s3(
     except (pd.errors.EmptyDataError, pd.errors.ParserError) as e:
         logger.debug(f"Failed to parse '{object_key}': {e}")
         return pd.DataFrame()
+
+
+def get_flat_file_path(files_dir: str, current_day: pd.Timestamp) -> str:
+    """Get the path for the cached flat file."""
+    date_str = current_day.strftime("%Y-%m-%d")
+    return f"{files_dir}/{date_str}.csv.gz"
+
+
+def save_flat_file(df: pd.DataFrame, file_path: str, logger: logging.Logger) -> None:
+    """Save the flat file to local cache."""
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    df.to_csv(file_path, index=False, compression="gzip")
+    logger.debug(f"Saved flat file: {file_path}")
+
+
+def create_empty_marker(file_path: str, logger: logging.Logger) -> None:
+    """Create an empty marker file."""
+    marker_path = f"{file_path}.empty"
+    os.makedirs(os.path.dirname(marker_path), exist_ok=True)
+    open(marker_path, "a").close()
+    logger.debug(f"Created empty marker: {marker_path}")
+
+
+def all_tickers_have_data(
+    prices_dir: str, tickers: list[str], current_day: pd.Timestamp, logger: logging.Logger
+) -> bool:
+    """Check if all tickers have data (or empty markers) for the given day."""
+    date_str = current_day.strftime("%Y-%m-%d")
+    if all(
+        os.path.exists(f"{prices_dir}/{ticker}/{date_str}.parquet")
+        or os.path.exists(f"{prices_dir}/{ticker}/{date_str}.parquet.empty")
+        for ticker in tickers
+    ):
+        logger.debug(f"Skipping records for {current_day.date()}...")
+        return True
+    return False
