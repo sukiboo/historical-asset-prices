@@ -58,6 +58,26 @@ Each Parquet file contains minute-level price data for that ticker and day, with
 - Index: `timestamp` (datetime64[ns, America/New_York])
 - Columns: `ticker`, `open`, `close`, `low`, `high`, `volume`
 
+```python
+# stock prices
+                          ticker    open   close     low    high  volume
+timestamp
+2025-01-02 04:00:00-05:00    SPY  588.22  588.80  588.12  589.07  2374.0
+2025-01-02 04:01:00-05:00    SPY  589.10  589.16  589.10  589.25   976.0
+2025-01-02 04:02:00-05:00    SPY  589.03  588.93  588.85  589.03  1018.0
+2025-01-02 04:03:00-05:00    SPY  588.90  588.90  588.90  588.90   441.0
+2025-01-02 04:04:00-05:00    SPY  589.00  589.00  589.00  589.00   924.0
+
+# options prices
+                                         ticker   open  close    low   high  volume
+timestamp
+2025-01-02 09:30:00-05:00  O:SPY250124P00604000  16.21  16.22  16.21  16.22       2
+2025-01-02 09:30:00-05:00  O:SPY250124P00540000   0.68   0.68   0.68   0.68      12
+2025-01-02 09:30:00-05:00  O:SPY250124P00505000   0.30   0.30   0.30   0.30       6
+2025-01-02 09:30:00-05:00  O:SPY250124P00500000   0.30   0.29   0.29   0.30       2
+2025-01-02 09:30:00-05:00  O:SPY250124P00450000   0.18   0.18   0.18   0.18      36
+```
+
 ### Loading Data
 
 Use `glob.glob()` with the `*.parquet` pattern to load only data files and exclude `.empty` marker files:
