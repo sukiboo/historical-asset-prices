@@ -60,7 +60,7 @@ Each Parquet file contains minute-level price data for that ticker and day, with
 
 ### Loading Data
 
-Load data using pandas with glob to filter only `.parquet` files:
+Use `glob.glob()` with the `*.parquet` pattern to load only data files and exclude `.empty` marker files:
 
 ```python
 import glob
@@ -78,8 +78,6 @@ stocks["close"].plot(title=f"{ticker} Closing Price")
 ```
 
 <img width="1027" height="545" alt="SPY Closing Price" src="https://github.com/user-attachments/assets/6cec4049-c3f0-446a-a4aa-09a0224883f3" />
-
-**Note:** Use `glob.glob()` with `*.parquet` pattern to exclude `.empty` marker files when loading data.
 
 ## Data Availability
 
