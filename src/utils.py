@@ -139,20 +139,20 @@ def aggs_to_df(
         from_date = kwargs.get("from_", "")
         to_date = kwargs.get("to", "")
 
-        logger.info(f"Retrieving {ticker} records from {from_date} to {to_date}...")
+        logger.debug(f"Retrieving {ticker} records from {from_date} to {to_date}...")
         aggs = func(*args, **kwargs)
 
         if not aggs:
-            logger.warning(f"No records returned for {ticker} from {from_date} to {to_date}")
+            logger.debug(f"No records returned for {ticker} from {from_date} to {to_date}")
             return None
         else:
             df = pd.DataFrame([agg.__dict__ for agg in aggs])
 
             if df.empty:
-                logger.warning(f"DataFrame is empty for {ticker} from {from_date} to {to_date}")
+                logger.debug(f"DataFrame is empty for {ticker} from {from_date} to {to_date}")
                 return None
             else:
-                logger.info(
+                logger.debug(
                     f"Retrieved {len(df)} records for {ticker} from {from_date} to {to_date}"
                 )
                 return df

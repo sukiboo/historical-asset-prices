@@ -4,6 +4,7 @@ from typing import cast
 
 import pandas as pd
 from massive import RESTClient
+from tqdm import tqdm
 
 from src.utils import aggs_to_df, save_daily_prices, with_retry
 
@@ -31,31 +32,36 @@ class StockPrices:
     def retrieve_prices(self) -> None:
         self.fetch_aggs = with_retry(aggs_to_df(self.client.list_aggs, logger))
 
-        current_day: pd.Timestamp = self.date_start
-        while current_day < self.date_end:
-            next_day = cast(pd.Timestamp, current_day + pd.Timedelta(days=1))
+        with tqdm(
+            total=(self.date_end - self.date_start).days, desc="Retrieving stock prices", unit="day"
+        ) as pbar:
+            current_day: pd.Timestamp = self.date_start
+            while current_day < self.date_end:
+                next_day = cast(pd.Timestamp, current_day + pd.Timedelta(days=1))
+                pbar.set_postfix({"date": current_day.strftime("%Y-%m-%d")})
 
-            for ticker in self.tickers:
-                if not self.ticker_has_stock_data(ticker, current_day):
-                    stock_prices = self.fetch_aggs(
-                        ticker=ticker,
-                        multiplier=1,
-                        timespan="minute",
-                        from_=current_day.strftime("%Y-%m-%d"),
-                        to=current_day.strftime("%Y-%m-%d"),
-                        adjusted=True,
-                        sort="asc",
-                        limit=10000,
-                    )
+                for ticker in self.tickers:
+                    if not self.ticker_has_stock_data(ticker, current_day):
+                        stock_prices = self.fetch_aggs(
+                            ticker=ticker,
+                            multiplier=1,
+                            timespan="minute",
+                            from_=current_day.strftime("%Y-%m-%d"),
+                            to=current_day.strftime("%Y-%m-%d"),
+                            adjusted=True,
+                            sort="asc",
+                            limit=10000,
+                        )
 
-                    if stock_prices is not None:
-                        self.parse_stock_prices(stock_prices, current_day, ticker)
+                        if stock_prices is not None:
+                            self.parse_stock_prices(stock_prices, current_day, ticker)
 
-            current_day = next_day
+                pbar.update(1)
+                current_day = next_day
 
     def ticker_has_stock_data(self, ticker: str, current_day: pd.Timestamp) -> bool:
         if os.path.exists(f"{self.data_dir}/{ticker}/{current_day.strftime('%Y-%m-%d')}.parquet"):
-            logger.info(f"Stock prices: skipping {ticker} records for {current_day.date()}...")
+            logger.debug(f"Stock prices: skipping {ticker} records for {current_day.date()}...")
             return True
         else:
             return False
