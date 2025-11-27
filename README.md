@@ -30,9 +30,10 @@ python main.py
 
 The script will:
 - Retrieve minute-level stock and option prices for all configured tickers
-- Skip months that already have data files (idempotent)
-- Save stock prices as Parquet files in `data/stocks/{TICKER}/{YYYY-MM}.parquet`
-- Save option prices as Parquet files in `data/options/{TICKER}/{YYYY-MM}.parquet`
+- Skip days that already have data files (idempotent)
+- Save stock prices as Parquet files in `data/stocks/{TICKER}/{YYYY-MM-DD}.parquet`
+- Save option prices as Parquet files in `data/options/{TICKER}/{YYYY-MM-DD}.parquet`
+- Create `.empty` marker files for days with no data (weekends/holidays) to avoid redundant API calls
 
 ## Data Structure
 
@@ -41,16 +42,51 @@ Data is organized in the `data/` directory:
 data/
 ├── stocks/
 │   └── TICKER/
-│       └── YYYY-MM.parquet
+│       ├── YYYY-MM-DD.parquet  (trading days with data)
+│       └── YYYY-MM-DD.empty    (weekends/holidays)
 └── options/
     └── TICKER/
-        └── YYYY-MM.parquet
+        ├── YYYY-MM-DD.parquet  (trading days with data)
+        └── YYYY-MM-DD.empty    (weekends/holidays)
 ```
 
-Each Parquet file contains minute-level price data for that ticker and month.
+Each Parquet file contains minute-level price data for that ticker and day, with the `timestamp` column as the index.
+
+### Data Schema
+
+**Stocks and Options:**
+- Index: `timestamp` (datetime64[ns, America/New_York])
+- Columns: `ticker`, `open`, `close`, `low`, `high`, `volume`
+
+### Loading Data
+
+Load data using pandas with glob to filter only `.parquet` files:
+
+```python
+import glob
+import pandas as pd
+
+# Load all stock data for a ticker (automatically sorted by timestamp)
+ticker = "SPY"
+stocks = pd.read_parquet(glob.glob(f"./data/stocks/{ticker}/*.parquet")).sort_index()
+
+# Load all option data for a ticker
+options = pd.read_parquet(glob.glob(f"./data/options/{ticker}/*.parquet")).sort_index()
+
+# Plot closing prices (timestamp is already the index)
+stocks["close"].plot(title=f"{ticker} Closing Price")
+```
+
+<img width="1027" height="545" alt="SPY Closing Price" src="https://github.com/user-attachments/assets/6cec4049-c3f0-446a-a4aa-09a0224883f3" />
+
+**Note:** Use `glob.glob()` with `*.parquet` pattern to exclude `.empty` marker files when loading data.
 
 ## Data Availability
 
 Stock prices are retrieved via the [Custom Bars REST API](https://massive.com/docs/rest/stocks/aggregates/custom-bars), which provides two years of historical data on a free plan.
 
 Option prices are retrieved via the [Minute Aggregates Flat Files](https://massive.com/docs/flat-files/options/minute-aggregates), which requires the Options Starter plan for the two years of historical data.
+
+## Sample Data
+
+A sample dataset of pre-retrieved historical prices is available for download: [Dropbox Shared Folder](https://www.dropbox.com/scl/fo/2hfetk4k4n3z139jyqhb3/APwMO_XOVTuaObJUWAAzH5o?rlkey=gphwsbuo1knb4d5popfd29k4t&st=2nv3atqg&dl=0)
