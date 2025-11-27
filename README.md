@@ -8,18 +8,29 @@ This repository retrieves historical stock and options price data for specified 
 
 ## Setup
 
-1. Install dependencies:
+1. Create and activate a virtual environment:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate
+   ```
+
+2. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-2. Set Massive API credentials:
+3. Set Massive API credentials:
    ```bash
    export MASSIVE_API_KEY=your_api_key_here
    export MASSIVE_AWS_ACCESS_KEY_ID=your_aws_access_key_id_here
    ```
 
-3. Configure tickers and date range in `src/constants.py`
+4. Configure retrieval parameters in `src/constants.py`:
+   ```python
+   TICKERS = ["SPY"]           # List of tickers to retrieve
+   DATE_START = "2025-01-01"   # Start date (YYYY-MM-DD)
+   DATE_END = "2025-02-01"     # End date (YYYY-MM-DD)
+   ```
 
 ## Usage
 
