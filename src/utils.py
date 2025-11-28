@@ -6,12 +6,12 @@ from typing import Any, Callable, cast
 import boto3
 import pandas as pd
 from botocore.config import Config
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, ReadTimeoutError
 from tenacity import (
     after_log,
     before_sleep_log,
     retry,
-    retry_if_exception,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
 )
@@ -98,10 +98,8 @@ def with_retry(
     @retry(
         stop=stop_after_attempt(max_retries),
         wait=wait_exponential(min=min_delay, max=max_delay),
-        retry=retry_if_exception(
-            lambda exc: isinstance(exc, MaxRetryError) and "too many 429" in str(exc).lower()
-        ),
-        before_sleep=before_sleep_log(effective_logger, logging.DEBUG),
+        retry=retry_if_exception_type((ReadTimeoutError, MaxRetryError, ConnectionError)),
+        before_sleep=before_sleep_log(effective_logger, logging.WARNING),
         after=after_log(effective_logger, logging.DEBUG),
     )
     def wrapper(*args: Any, **kwargs: Any):
