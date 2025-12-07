@@ -163,9 +163,14 @@ def get_file_from_s3(
             return result
 
     except ClientError as e:
-        if e.response.get("Error", {}).get("Code") == "NoSuchKey":
+        error_code = e.response.get("Error", {}).get("Code")
+        if error_code == "NoSuchKey":
             logger.debug(f"File not found: '{object_key}'")
             return pd.DataFrame()
+        if error_code == "403":
+            raise RuntimeError(
+                f"Access denied for '{object_key}': your plan may not include this date range"
+            ) from e
         raise RuntimeError(f"Failed to download '{object_key}': {e}") from e
     except (pd.errors.EmptyDataError, pd.errors.ParserError) as e:
         logger.debug(f"Failed to parse '{object_key}': {e}")
