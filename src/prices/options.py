@@ -15,6 +15,7 @@ class OptionPrices(BasePrices):
             date_end=date_end,
             asset_type="options",
             s3_prefix="us_options_opra",
+            available_from="2014-06-01",
         )
 
     def filter_ticker_data(self, data: pd.DataFrame, ticker: str) -> pd.DataFrame:

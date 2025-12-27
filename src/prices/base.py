@@ -29,9 +29,11 @@ class BasePrices(ABC):
         date_end: pd.Timestamp,
         asset_type: str,
         s3_prefix: str,
+        available_from: str,
     ) -> None:
         self.tickers = [ticker.upper() for ticker in tickers]
-        self.date_start = date_start
+        self.available_from = pd.Timestamp(available_from)
+        self.date_start = max(date_start, self.available_from)
         self.date_end = date_end
         self.asset_type = asset_type
         self.s3_prefix = s3_prefix
@@ -47,6 +49,17 @@ class BasePrices(ABC):
 
     def retrieve_prices(self) -> None:
         """Download flat files from S3 and process them into per-ticker parquet files."""
+        if not self.tickers:
+            logger.info(f"No {self.asset_type} tickers provided, skipping retrieval")
+            return
+
+        if self.date_start >= self.date_end:
+            logger.info(
+                f"Date range is before {self.asset_type} availability start date "
+                f"{self.available_from.date()}, skipping retrieval"
+            )
+            return
+
         fetch_aggs = with_retry(get_file_from_s3)
 
         with tqdm(

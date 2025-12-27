@@ -15,6 +15,7 @@ class StockPrices(BasePrices):
             date_end=date_end,
             asset_type="stocks",
             s3_prefix="us_stocks_sip",
+            available_from="2003-10-01",
         )
 
     def filter_ticker_data(self, data: pd.DataFrame, ticker: str) -> pd.DataFrame:

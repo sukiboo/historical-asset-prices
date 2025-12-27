@@ -15,6 +15,7 @@ class CryptoPrices(BasePrices):
             date_end=date_end,
             asset_type="crypto",
             s3_prefix="global_crypto",
+            available_from="2013-11-01",
         )
 
     def filter_ticker_data(self, data: pd.DataFrame, ticker: str) -> pd.DataFrame:

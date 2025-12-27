@@ -15,6 +15,7 @@ class ForexPrices(BasePrices):
             date_end=date_end,
             asset_type="forex",
             s3_prefix="global_forex",
+            available_from="2009-10-01",
         )
 
     def filter_ticker_data(self, data: pd.DataFrame, ticker: str) -> pd.DataFrame:
