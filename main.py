@@ -1,7 +1,14 @@
 import logging
 
-from src.constants import CRYPTO_TICKERS, DATE_END, DATE_START, STOCK_TICKERS
+from src.constants import (
+    CRYPTO_TICKERS,
+    DATE_END,
+    DATE_START,
+    FOREX_TICKERS,
+    STOCK_TICKERS,
+)
 from src.crypto_prices import CryptoPrices
+from src.forex_prices import ForexPrices
 from src.option_prices import OptionPrices
 from src.stock_prices import StockPrices
 from src.utils import setup_logging, to_timestamp
@@ -29,3 +36,9 @@ logger.info(
 )
 crypto_prices = CryptoPrices(CRYPTO_TICKERS, date_start, date_end)
 crypto_prices.retrieve_prices()
+
+logger.info(
+    f"Retrieving forex prices for {FOREX_TICKERS} from {date_start.date()} to {date_end.date()}"
+)
+forex_prices = ForexPrices(FOREX_TICKERS, date_start, date_end)
+forex_prices.retrieve_prices()

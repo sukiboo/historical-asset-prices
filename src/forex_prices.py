@@ -3,8 +3,8 @@ import pandas as pd
 from src.base_prices import BasePrices
 
 
-class OptionPrices(BasePrices):
-    """Retrieve and process option price data from flat files."""
+class ForexPrices(BasePrices):
+    """Retrieve and process forex price data from flat files."""
 
     def __init__(
         self, tickers: list[str], date_start: pd.Timestamp, date_end: pd.Timestamp
@@ -13,10 +13,10 @@ class OptionPrices(BasePrices):
             tickers=tickers,
             date_start=date_start,
             date_end=date_end,
-            asset_type="options",
-            s3_prefix="us_options_opra",
+            asset_type="forex",
+            s3_prefix="global_forex",
         )
 
     def filter_ticker_data(self, data: pd.DataFrame, ticker: str) -> pd.DataFrame:
-        """Filter option contracts for a specific underlying ticker, e.g. O:SPY240105C00485000."""
-        return data[data["ticker"].str.startswith(f"O:{ticker}")].copy()
+        """Filter forex prices for a specific ticker, e.g. C:EUR-USD."""
+        return data[data["ticker"] == f"C:{ticker}"].copy()

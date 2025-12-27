@@ -18,5 +18,5 @@ class StockPrices(BasePrices):
         )
 
     def filter_ticker_data(self, data: pd.DataFrame, ticker: str) -> pd.DataFrame:
-        """Filter stock prices for a specific ticker."""
+        """Filter stock prices for a specific ticker, e.g. SPY."""
         return data[data["ticker"] == ticker].copy()

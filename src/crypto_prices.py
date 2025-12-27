@@ -18,5 +18,5 @@ class CryptoPrices(BasePrices):
         )
 
     def filter_ticker_data(self, data: pd.DataFrame, ticker: str) -> pd.DataFrame:
-        """Filter crypto prices for a specific ticker."""
+        """Filter crypto prices for a specific ticker, e.g. X:BTC-USD."""
         return data[data["ticker"] == f"X:{ticker}"].copy()
