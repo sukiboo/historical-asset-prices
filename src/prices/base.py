@@ -6,7 +6,7 @@ from typing import cast
 import pandas as pd
 from tqdm import tqdm
 
-from src.utils import (
+from ..utils import (
     all_tickers_have_data,
     create_empty_marker,
     get_file_from_s3,

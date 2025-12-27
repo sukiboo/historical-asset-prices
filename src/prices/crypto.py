@@ -1,6 +1,6 @@
 import pandas as pd
 
-from src.base_prices import BasePrices
+from .base import BasePrices
 
 
 class CryptoPrices(BasePrices):

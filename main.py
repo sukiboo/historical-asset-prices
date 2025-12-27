@@ -7,10 +7,7 @@ from src.constants import (
     FOREX_TICKERS,
     STOCK_TICKERS,
 )
-from src.crypto_prices import CryptoPrices
-from src.forex_prices import ForexPrices
-from src.option_prices import OptionPrices
-from src.stock_prices import StockPrices
+from src.prices import CryptoPrices, ForexPrices, OptionPrices, StockPrices
 from src.utils import setup_logging, to_timestamp
 
 logger = setup_logging(console_level=logging.INFO, file_level=logging.DEBUG)
