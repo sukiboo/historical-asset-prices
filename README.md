@@ -1,10 +1,10 @@
 # Historical Asset Prices
 
-A Python script to retrieve historical stock and option prices at minute intervals using the [massive](https://github.com/massive-com/client-python) library.
+A Python script to retrieve historical prices for stocks, options, crypto, and forex at minute intervals using the [massive](https://github.com/massive-com/client-python) library.
 
 ## Overview
 
-This repository retrieves historical stock and options price data for specified tickers at a minute interval and saves the data to the `/data` directory, organized by ticker and month in Parquet format.
+This repository retrieves historical price data for stocks, options, crypto, and forex at a minute interval and saves the data to the `/data` directory, organized by asset type and ticker in Parquet format.
 
 ## Setup
 
@@ -27,9 +27,11 @@ This repository retrieves historical stock and options price data for specified 
 
 4. Configure retrieval parameters in `src/constants.py`:
    ```python
-   TICKERS = ["SPY"]           # List of tickers to retrieve
-   DATE_START = "2025-01-01"   # Start date (YYYY-MM-DD)
-   DATE_END = "2025-02-01"     # End date (YYYY-MM-DD)
+   STOCK_TICKERS = ["SPY"]       # List of stock tickers to retrieve
+   CRYPTO_TICKERS = ["BTC-USD"]  # List of crypto tickers to retrieve
+   FOREX_TICKERS = ["EUR-USD"]   # List of forex tickers to retrieve
+   DATE_START = "2025-01-01"     # Start date, inclusive (YYYY-MM-DD)
+   DATE_END = "2025-02-01"       # End date, exclusive (YYYY-MM-DD)
    ```
 
 ## Usage
@@ -54,18 +56,23 @@ data/
 │   ├── stocks/
 │   │   ├── YYYY-MM-DD.csv.gz        (daily flat file with all stocks)
 │   │   └── YYYY-MM-DD.csv.gz.empty  (marker for no data)
-│   └── options/
-│       ├── YYYY-MM-DD.csv.gz        (daily flat file with all options)
-│       └── YYYY-MM-DD.csv.gz.empty  (marker for no data)
+│   ├── options/
+│   │   └── ...
+│   ├── crypto/
+│   │   └── ...
+│   └── forex/
+│       └── ...
 └── prices/                     # Extracted per-ticker data
     ├── stocks/
     │   └── TICKER/
     │       ├── YYYY-MM-DD.parquet        (trading days with data)
     │       └── YYYY-MM-DD.parquet.empty  (weekends/holidays)
-    └── options/
-        └── TICKER/
-            ├── YYYY-MM-DD.parquet        (trading days with data)
-            └── YYYY-MM-DD.parquet.empty  (weekends/holidays)
+    ├── options/
+    │   └── ...
+    ├── crypto/
+    │   └── ...
+    └── forex/
+        └── ...
 ```
 
 Each Parquet file contains minute-level price data for that ticker and day, with the `timestamp` column as the index.
@@ -98,29 +105,35 @@ timestamp
 
 ### Loading Data
 
-Use `glob.glob()` with the `*.parquet` pattern to load only data files and exclude `.empty` marker files:
+Use `glob.glob()` with the `*.parquet` pattern to load data files while excluding `.empty` marker files:
 
 ```python
 import glob
 import pandas as pd
 
-# Load all stock data for a ticker (automatically sorted by timestamp)
-ticker = "SPY"
-stocks = pd.read_parquet(glob.glob(f"./data/prices/stocks/{ticker}/*.parquet")).sort_index()
+# Load all stock data for a ticker
+stocks = pd.read_parquet(glob.glob("./data/prices/stocks/SPY/*.parquet")).sort_index()
 
 # Load all option data for a ticker
-options = pd.read_parquet(glob.glob(f"./data/prices/options/{ticker}/*.parquet")).sort_index()
+options = pd.read_parquet(glob.glob("./data/prices/options/SPY/*.parquet")).sort_index()
 
-# Plot closing prices (timestamp is already the index)
-stocks["close"].plot(title=f"{ticker} Closing Price")
+# Load all crypto data for a ticker
+crypto = pd.read_parquet(glob.glob("./data/prices/crypto/BTC-USD/*.parquet")).sort_index()
+
+# Load all forex data for a ticker
+forex = pd.read_parquet(glob.glob("./data/prices/forex/EUR-USD/*.parquet")).sort_index()
 ```
+
+See `load_data.ipynb` for a more complete example.
 
 <img width="1027" height="545" alt="SPY Closing Price" src="https://github.com/user-attachments/assets/6cec4049-c3f0-446a-a4aa-09a0224883f3" />
 
 ## Data Availability
 
-Both stock and option prices are retrieved via [Minute Aggregates Flat Files](https://massive.com/docs/flat-files):
+All prices are retrieved via [Minute Aggregates Flat Files](https://massive.com/docs/flat-files):
 - **Stocks**: [Stock Minute Aggregates](https://massive.com/docs/flat-files/stocks/minute-aggregates)
 - **Options**: [Option Minute Aggregates](https://massive.com/docs/flat-files/options/minute-aggregates)
+- **Crypto**: [Crypto Minute Aggregates](https://massive.com/docs/flat-files/crypto/minute-aggregates)
+- **Forex**: [Forex Minute Aggregates](https://massive.com/docs/flat-files/forex/minute-aggregates)
 
-A sample dataset of pre-retrieved historical prices is available for download: [Dropbox Shared Folder](https://www.dropbox.com/scl/fo/2hfetk4k4n3z139jyqhb3/APwMO_XOVTuaObJUWAAzH5o?rlkey=gphwsbuo1knb4d5popfd29k4t&st=2nv3atqg&dl=0)
+A sample dataset of pre-retrieved historical prices for 2024 is available for download: [Dropbox Shared Folder](https://www.dropbox.com/scl/fo/2hfetk4k4n3z139jyqhb3/APwMO_XOVTuaObJUWAAzH5o?rlkey=gphwsbuo1knb4d5popfd29k4t&st=2nv3atqg&dl=0)
