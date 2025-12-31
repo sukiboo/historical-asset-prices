@@ -1,10 +1,11 @@
-# Historical Asset Prices
+# 🗃️ Historical Asset Prices 🗃️
 
-A Python script to retrieve historical prices for stocks, options, crypto, and forex at minute intervals using the [massive](https://github.com/massive-com/client-python) library.
+A Python script to retrieve historical prices for stocks, options, crypto, and forex at minute intervals using the [~~Polygon.io~~ Massive](https://github.com/massive-com/client-python) library.
 
 ## Overview
 
 This repository retrieves historical price data for stocks, options, crypto, and forex at a minute interval and saves the data to the `/data` directory, organized by asset type and ticker in Parquet format.
+Note that the data contains raw historical prices that are not adjusted for inflation, dividends, stock splits, etc.
 
 ## Setup
 
@@ -45,7 +46,7 @@ The script will:
 - Download daily flat files from S3 containing all tickers (cached in `data/files/`)
 - Extract and save per-ticker data as Parquet files (in `data/prices/`)
 - Skip days that already have data files (idempotent)
-- Create `.empty` marker files for days with no data (weekends/holidays) to avoid redundant downloads
+- Create `.empty` marker files for days with no data (weekends/holidays) to avoid redundant API calls
 
 ## Data Structure
 
@@ -130,10 +131,10 @@ See `load_data.ipynb` for a more complete example.
 
 ## Data Availability
 
-All prices are retrieved via [Minute Aggregates Flat Files](https://massive.com/docs/flat-files):
+All prices are retrieved via [Minute Aggregates Flat Files REST API](https://massive.com/docs/flat-files):
 - **Stocks**: [Stock Minute Aggregates](https://massive.com/docs/flat-files/stocks/minute-aggregates)
 - **Options**: [Option Minute Aggregates](https://massive.com/docs/flat-files/options/minute-aggregates)
 - **Crypto**: [Crypto Minute Aggregates](https://massive.com/docs/flat-files/crypto/minute-aggregates)
 - **Forex**: [Forex Minute Aggregates](https://massive.com/docs/flat-files/forex/minute-aggregates)
 
-A sample dataset of pre-retrieved historical prices for 2024 is available for download: [Dropbox Shared Folder](https://www.dropbox.com/scl/fo/2hfetk4k4n3z139jyqhb3/APwMO_XOVTuaObJUWAAzH5o?rlkey=gphwsbuo1knb4d5popfd29k4t&st=2nv3atqg&dl=0)
+A dataset of all historical prices up to 2026 is available on ✨ [my dropbox](https://www.dropbox.com/scl/fo/xd5a5s5cwa0imf6gvplzv/AL1ffzRw3_AEfeEwRoKLQms?rlkey=ah6c8ps5zvco29npoeoro831k&st=zd6g4y7x&dl=0) ✨
