@@ -5,7 +5,6 @@ A Python script to retrieve historical price files for stocks, options, crypto, 
 ## Overview
 
 This repository downloads raw minute-level price data files from S3 containing all tickers. Files are stored locally in `files/{asset_type}/` directory.
-
 Note that the data contains raw historical prices that are not adjusted for inflation, dividends, stock splits, etc.
 
 ## Setup
@@ -80,21 +79,31 @@ Load the gzipped CSV files using pandas:
 import glob
 import pandas as pd
 
-# Load all stock data for a specific date range
+# load all stock data for a specific date range
 stock_files = glob.glob("./files/stocks/2025-01-*.csv.gz")
 stocks = pd.concat([pd.read_csv(f, compression="gzip") for f in stock_files], ignore_index=True)
 
-# Load all crypto data
-crypto_files = glob.glob("./files/crypto/2025-01-*.csv.gz")
-crypto = pd.concat([pd.read_csv(f, compression="gzip") for f in crypto_files], ignore_index=True)
+# filter for specific tickers after loading
+df = stocks[stocks["ticker"] == "SPY"].copy()
 
-# Filter for specific tickers after loading
-spy_data = stocks[stocks["ticker"] == "SPY"]
+# convert window_start to datetime and set as index
+df["timestamp"] = pd.to_datetime(df["window_start"], unit="ns")
+df = df.set_index("timestamp").sort_index()
+
+df.head()
 ```
 
-The CSV files contain columns: `window_start`, `ticker`, `open`, `close`, `low`, `high`, `volume`. The `window_start` column contains Unix timestamps in nanoseconds (UTC).
+The CSV files contain columns: `window_start`, `ticker`, `open`, `close`, `low`, `high`, `volume`, `transactions`. The `window_start` column contains Unix timestamps in nanoseconds (UTC).
 
-<img width="1027" height="545" alt="SPY Closing Price" src="https://github.com/user-attachments/assets/6cec4049-c3f0-446a-a4aa-09a0224883f3" />
+| timestamp            | ticker | volume | open   | close  | high   | low    | window_start          | transactions |
+|---------------------|--------|--------|--------|--------|--------|--------|-----------------------|--------------|
+| 2025-01-03 09:00:00 | SPY    | 4401   | 586.00 | 586.01 | 586.05 | 585.89 | 1735894800000000000   | 37           |
+| 2025-01-03 09:01:00 | SPY    | 4318   | 586.04 | 585.98 | 586.04 | 585.98 | 1735894860000000000   | 26           |
+| 2025-01-03 09:02:00 | SPY    | 4236   | 586.10 | 586.10 | 586.16 | 586.10 | 1735894920000000000   | 22           |
+| 2025-01-03 09:03:00 | SPY    | 1415   | 586.09 | 586.23 | 586.23 | 586.09 | 1735894980000000000   | 31           |
+| 2025-01-03 09:05:00 | SPY    | 343    | 586.37 | 586.37 | 586.37 | 586.37 | 1735895100000000000   | 11           |
+
+<img width="1184" height="584" alt="Image" src="https://github.com/user-attachments/assets/0f575af5-27f0-4fdc-a132-5bae7c7fbabb" />
 
 ## Data Availability
 
@@ -104,4 +113,4 @@ All prices are retrieved via [Minute Aggregates Flat Files REST API](https://mas
 - **Crypto**: [Crypto Minute Aggregates](https://massive.com/docs/flat-files/crypto/minute-aggregates)
 - **Forex**: [Forex Minute Aggregates](https://massive.com/docs/flat-files/forex/minute-aggregates)
 
-A dataset of all historical prices up to 2026 is available on ✨ [my dropbox](https://www.dropbox.com/scl/fo/xd5a5s5cwa0imf6gvplzv/AL1ffzRw3_AEfeEwRoKLQms?rlkey=ah6c8ps5zvco29npoeoro831k&st=zd6g4y7x&dl=0) ✨
+✨ [Pre-2026 data](https://www.dropbox.com/scl/fo/xd5a5s5cwa0imf6gvplzv/AL1ffzRw3_AEfeEwRoKLQms?rlkey=ah6c8ps5zvco29npoeoro831k&st=zd6g4y7x&dl=0) ✨ -- all available daily files for all assets up to 2026 🎉

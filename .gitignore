@@ -1,7 +1,5 @@
 tmp*
-data/
 files/
-venv/
 __pycache__/
 *.pyc
 *.pyo

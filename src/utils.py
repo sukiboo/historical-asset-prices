@@ -26,8 +26,8 @@ def setup_logging(
     console_level: int = logging.INFO,
     file_level: int = logging.DEBUG,
     log_file: str = "logs.log",
-    max_bytes: int = 10 * 1024 * 1024,
-    backup_count: int = 5,
+    max_bytes: int = 100 * 1024 * 1024,
+    backup_count: int = 10,
 ) -> logging.Logger:
     """Configure root logging once and return the application logger.
 
