@@ -4,20 +4,16 @@ from .base import BasePrices
 
 
 class CryptoPrices(BasePrices):
-    """Retrieve and process crypto price data from flat files."""
+    """Retrieve raw crypto price flat files from S3."""
 
     def __init__(
-        self, tickers: list[str], date_start: pd.Timestamp, date_end: pd.Timestamp
+        self, date_start: pd.Timestamp, date_end: pd.Timestamp, tickers: list[str] | None = None
     ) -> None:
         super().__init__(
-            tickers=tickers,
             date_start=date_start,
             date_end=date_end,
             asset_type="crypto",
             s3_prefix="global_crypto",
             available_from="2013-11-01",
+            tickers=tickers,
         )
-
-    def filter_ticker_data(self, data: pd.DataFrame, ticker: str) -> pd.DataFrame:
-        """Filter crypto prices for a specific ticker, e.g. X:BTC-USD."""
-        return data[data["ticker"] == f"X:{ticker}"].copy()

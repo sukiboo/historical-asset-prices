@@ -1,45 +1,64 @@
 repos:
--   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v3.2.0
+  # Basic file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
     hooks:
-    -   id: check-json
-    -   id: check-yaml
-    -   id: end-of-file-fixer
-    -   id: mixed-line-ending
-    -   id: trailing-whitespace
+      - id: check-json
+      - id: check-yaml
+      - id: check-toml
+      - id: check-xml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: trailing-whitespace
 
--   repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.11.2
+  # Python type checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.19.1
     hooks:
-    -   id: mypy
-        additional_dependencies: ['types-PyYAML']
+      - id: mypy
+        additional_dependencies: [types-PyYAML]
 
--   repo: https://github.com/PyCQA/isort
+  # Python import sorting
+  - repo: https://github.com/PyCQA/isort
     rev: 5.13.2
     hooks:
-    -   id: isort
-        args: ["--profile", "black", "--filter-files", "--combine-as"]
+      - id: isort
+        args: [--profile=black, --filter-files, --combine-as]
 
--   repo: https://github.com/pycqa/flake8
-    rev: 7.1.1
+  # Python linting
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.3.0
     hooks:
-    -   id: flake8
-        args: ["--ignore", "E501,F541", "--select", "F,E9,K1,W605"]
+      - id: flake8
+        args: ['--extend-ignore=E501,F541', '--select=F,E9,W605']
 
--   repo: https://github.com/psf/black
-    rev: 24.8.0
+  # Python security checks
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.9.2
     hooks:
-    -   id: black
-        args: ["--line-length", "100"]
+      - id: bandit
+        args: [-ll, -i, -x, tests/]
 
--   repo: https://github.com/nbQA-dev/nbQA
-    rev: 1.9.0
+  # Python code formatting
+  - repo: https://github.com/psf/black
+    rev: 25.12.0
     hooks:
-    -   id: nbqa-mypy
-        args: ["--ignore-missing-imports"]
-    -   id: nbqa-isort
-        args: ["--profile=black", "--combine-as"]
-    -   id: nbqa-flake8
-        args: ["--ignore=E501,F541", "--select=F,E9,K1,W605"]
-    -   id: nbqa-black
-        args: ["--line-length=100"]
+      - id: black
+        args: [--line-length=100]
+
+  # Jupyter notebook support (runs tools on .ipynb files)
+  - repo: https://github.com/nbQA-dev/nbQA
+    rev: 1.9.1
+    hooks:
+      - id: nbqa-mypy
+        args: [--ignore-missing-imports]
+      - id: nbqa-isort
+        args: [--profile=black, --combine-as]
+      - id: nbqa-flake8
+        args: ['--extend-ignore=E501,F541', '--select=F,E9,W605']
+      - id: nbqa-black
+        args: [--line-length=100]
