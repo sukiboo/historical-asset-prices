@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import os
 from logging.handlers import RotatingFileHandler
@@ -104,19 +105,30 @@ def with_retry(
     )
     def wrapper(*args: Any, **kwargs: Any):
         result = func(*args, **kwargs)
-        if hasattr(result, "__iter__") and not isinstance(result, (str, bytes, pd.DataFrame)):
+        if hasattr(result, "__iter__") and not isinstance(result, (str, bytes, pd.DataFrame, dict)):
             return list(result)
         return result
 
     return wrapper
 
 
-def save_daily_prices(df: pd.DataFrame, file_path: str) -> None:
-    dir_path = os.path.dirname(file_path)
-    if dir_path:
-        os.makedirs(dir_path, exist_ok=True)
-    # assume index is the timestamp
-    df.to_parquet(file_path, index=True)
+def get_s3_client(
+    aws_access_key_id: str | None = None,
+    aws_secret_access_key: str | None = None,
+):
+    """Create and return an S3 client."""
+    if not aws_access_key_id or not aws_secret_access_key:
+        raise ValueError("AWS credentials are missing!")
+
+    session = boto3.Session(
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_secret_access_key,
+    )
+    return session.client(
+        "s3",
+        endpoint_url="https://files.massive.com",
+        config=Config(signature_version="s3v4"),
+    )
 
 
 def get_file_from_s3(
@@ -125,56 +137,59 @@ def get_file_from_s3(
     logger: logging.Logger,
     aws_access_key_id: str | None = None,
     aws_secret_access_key: str | None = None,
-) -> pd.DataFrame:
+    if_none_match: str | None = None,
+) -> tuple[bytes | None, str | None, bool]:
     """
-    Get a minute aggregates flat file from S3:
+    Get a minute aggregates flat file from S3 as raw bytes:
     - Stocks: https://massive.com/docs/flat-files/stocks/minute-aggregates
     - Options: https://massive.com/docs/flat-files/options/minute-aggregates
 
-    Returns empty DataFrame if file doesn't exist (weekends/holidays).
-    """
-    if not aws_access_key_id or not aws_secret_access_key:
-        raise ValueError("AWS credentials are missing!")
+    Args:
+        if_none_match: ETag to use for conditional GET. If provided and file unchanged,
+                      returns None bytes.
 
-    session = boto3.Session(
-        aws_access_key_id=aws_access_key_id,
-        aws_secret_access_key=aws_secret_access_key,
-    )
-    s3 = session.client(
-        "s3",
-        endpoint_url="https://files.massive.com",
-        config=Config(signature_version="s3v4"),
-    )
+    Returns:
+        Tuple of (bytes or None, ETag, file_exists).
+        - If file unchanged (304): (None, None, True)
+        - If file doesn't exist (404): (None, None, False)
+        - If file downloaded: (bytes, ETag, True)
+    """
+    s3 = get_s3_client(aws_access_key_id, aws_secret_access_key)
 
     logger.debug(f"Downloading '{object_key}' from '{bucket_name}'...")
     try:
-        response = s3.get_object(Bucket=bucket_name, Key=object_key)
-        result = pd.read_csv(
-            response["Body"], compression="gzip" if object_key.endswith(".gz") else None
-        )
+        kwargs = {"Bucket": bucket_name, "Key": object_key}
+        if if_none_match:
+            kwargs["IfNoneMatch"] = if_none_match
 
-        if not isinstance(result, pd.DataFrame):
-            raise ValueError(f"Expected DataFrame but got {type(result)}")
-        elif result.empty:
-            logger.debug(f"Data from '{object_key}' is empty")
-            return pd.DataFrame()
-        else:
-            logger.debug(f"Successfully downloaded '{object_key}' ({len(result)} rows)")
-            return result
+        response = s3.get_object(**kwargs)
+
+        # Get ETag from response
+        etag = response.get("ETag", "").strip('"')
+
+        # Read raw bytes
+        file_bytes = response["Body"].read()
+
+        logger.debug(f"Successfully downloaded '{object_key}' ({len(file_bytes)} bytes)")
+        return file_bytes, etag, True
 
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code")
-        if error_code == "NoSuchKey":
+        http_status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+
+        # Handle 304 Not Modified (file unchanged)
+        if http_status == 304 or error_code == "NotModified":
+            logger.debug(f"File unchanged: '{object_key}'")
+            return None, None, True
+
+        if error_code == "NoSuchKey" or http_status == 404:
             logger.debug(f"File not found: '{object_key}'")
-            return pd.DataFrame()
-        if error_code == "403":
+            return None, None, False
+        if error_code == "403" or http_status == 403:
             raise RuntimeError(
                 f"Access denied for '{object_key}': your plan may not include this date range"
             ) from e
         raise RuntimeError(f"Failed to download '{object_key}': {e}") from e
-    except (pd.errors.EmptyDataError, pd.errors.ParserError) as e:
-        logger.debug(f"Failed to parse '{object_key}': {e}")
-        return pd.DataFrame()
 
 
 def get_flat_file_path(files_dir: str, current_day: pd.Timestamp) -> str:
@@ -183,10 +198,11 @@ def get_flat_file_path(files_dir: str, current_day: pd.Timestamp) -> str:
     return f"{files_dir}/{date_str}.csv.gz"
 
 
-def save_flat_file(df: pd.DataFrame, file_path: str, logger: logging.Logger) -> None:
-    """Save the flat file to local cache."""
+def save_flat_file_bytes(file_bytes: bytes, file_path: str, logger: logging.Logger) -> None:
+    """Save the raw file bytes to local cache."""
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    df.to_csv(file_path, index=False, compression="gzip")
+    with open(file_path, "wb") as f:
+        f.write(file_bytes)
     logger.debug(f"Saved flat file: {file_path}")
 
 
@@ -198,16 +214,13 @@ def create_empty_marker(file_path: str, logger: logging.Logger) -> None:
     logger.debug(f"Created empty marker: {marker_path}")
 
 
-def all_tickers_have_data(
-    prices_dir: str, tickers: list[str], current_day: pd.Timestamp, logger: logging.Logger
-) -> bool:
-    """Check if all tickers have data (or empty markers) for the given day."""
-    date_str = current_day.strftime("%Y-%m-%d")
-    if all(
-        os.path.exists(f"{prices_dir}/{ticker}/{date_str}.parquet")
-        or os.path.exists(f"{prices_dir}/{ticker}/{date_str}.parquet.empty")
-        for ticker in tickers
-    ):
-        logger.debug(f"Skipping records for {current_day.date()}...")
-        return True
-    return False
+def compute_file_md5(file_path: str) -> str | None:
+    """Compute MD5 hash of a local file. Returns None if file doesn't exist."""
+    if not os.path.exists(file_path):
+        return None
+
+    hash_md5 = hashlib.md5(usedforsecurity=False)
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
