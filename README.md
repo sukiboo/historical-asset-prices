@@ -29,15 +29,15 @@ Note that the data contains raw historical prices that are not adjusted for infl
 
 4. Configure retrieval parameters in `src/constants.py`:
    ```python
-   # Asset type retrieval flags
+   # asset type retrieval flags
    RETRIEVE_STOCKS = True
    RETRIEVE_OPTIONS = True
    RETRIEVE_CRYPTO = True
    RETRIEVE_FOREX = True
 
-   # Date range for file retrieval
-   DATE_START = "2025-01-01"     # Start date, inclusive (YYYY-MM-DD)
-   DATE_END = "2025-02-01"       # End date, exclusive (YYYY-MM-DD)
+   # date range for file retrieval
+   DATE_START = "2025-01-01"     # start date, inclusive (YYYY-MM-DD)
+   DATE_END = "2025-01-03"       # end date, exclusive (YYYY-MM-DD)
    ```
 
 ## Usage
